@@ -8,5 +8,10 @@ D,1,7,ADC6
 D,1,8,ADC7
 B,2,1,V0_state
 B,2,2,V1_state
+B,2,3,V2_state
+B,2,4,V3_state
+B,2,5,V4_state
+B,2,6,V5_state
 W,3,1,systemTicks
 W,3,2,idleCnt
+B,3,3,taskLoad
