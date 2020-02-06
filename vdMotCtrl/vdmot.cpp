@@ -145,29 +145,37 @@ errT vdmot::closeValve()
     {
         _startRun(0, _calValueClose*2U);
         _target = 0;
+        return NO_ERROR;
+    } else {
+        return ERROR_BUSY;
     }
     
-    return NO_ERROR;
 }
 
 // direction: 0 - close, 1 - open
 errT vdmot::_startRun(uint8_t direction, uint32_t ticks){
-    if (direction)
-    {
-        HWE::setPin(_pinA,0);
-        HWE::setPin(_pinB,1);
-    }
-    else
-    {
-        HWE::setPin(_pinA,1);
-        HWE::setPin(_pinB,0);
-    }
-    _dir = direction;
     
-    _ticksRunStart = systemTicks;
-    _ticksRunTarget = systemTicks + ticks;
-    _state = STATE_START_RUNNING;
-    return NO_ERROR;
+    if (_state == STATE_IDLE)
+    {
+        if (direction)
+        {
+            HWE::setPin(_pinA,0);
+            HWE::setPin(_pinB,1);
+        }
+        else
+        {
+            HWE::setPin(_pinA,1);
+            HWE::setPin(_pinB,0);
+        }
+        _dir = direction;
+        
+        _ticksRunStart = systemTicks;
+        _ticksRunTarget = systemTicks + ticks;
+        _state = STATE_START_RUNNING;
+        return NO_ERROR;
+    } else {
+        return ERROR_BUSY;
+    }            
 }
 
 errT vdmot::_stopRun(){
