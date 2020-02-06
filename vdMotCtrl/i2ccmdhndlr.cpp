@@ -19,6 +19,8 @@
 #define I2C_SPEED	 100000UL
 #define PRESCALER		  1
 
+#define I2C_RXBUFFER_SIZE 6
+
 #define I2C_TWBR_VAL (F_CPU)/(I2C_SPEED*2*PRESCALER)-8/PRESCALER
 #if I2C_TWBR_VAL > 255
 #error ("TWBR value too large")
@@ -26,11 +28,11 @@
 #endif
 
 volatile uint8_t rxDataPtr;
-volatile uint8_t rxbuffer[4];
+volatile uint8_t rxbuffer[I2C_RXBUFFER_SIZE];
 volatile uint8_t flgRxCmd;
 volatile uint8_t txDataPtr;
 volatile uint8_t txDataLen;
-volatile uint8_t txbuffer[4];
+volatile uint8_t txbuffer[8];
 
 i2cCmdHndlr::i2cCmdHndlr(uint8_t address):
 _ownAddress(address)
@@ -89,23 +91,25 @@ ISR(TWI_vect){
     {
         case TW_SR_SLA_ACK:
         rxDataPtr = 0;
-        twcrVal |= (1<<TWIE) | (1<<TWINT) | (1<<TWEA) | (1<<TWEN);
+        TWCR |= (1<<TWIE) | (1<<TWINT) | (1<<TWEA) | (1<<TWEN);
         break;
         
         case TW_SR_DATA_ACK:
         rxbuffer[rxDataPtr++] = dataRec;
-        twcrVal |= (1<<TWIE) | (1<<TWINT) | (1<<TWEA) | (1<<TWEN);
-        if(rxDataPtr >=4){
-            twcrVal &= ~(1<<TWEA);
+        TWCR |= (1<<TWIE) | (1<<TWINT) | (1<<TWEA) | (1<<TWEN);
+        // next byte is last of buffer size -> send NAK
+        if(rxDataPtr >= I2C_RXBUFFER_SIZE-1){
+            TWCR &= ~(1<<TWEA);
         }
         break;
         
         case TW_SR_DATA_NACK:
         rxbuffer[rxDataPtr++] = dataRec;
-        twcrVal |= (1<<TWIE) | (1<<TWINT) | (1<<TWEA) | (1<<TWEN);
+        TWCR |= (1<<TWIE) | (1<<TWINT) | (1<<TWEA) | (1<<TWEN);
         break;
         
         case TW_SR_STOP:
+        TWCR |= (1<<TWINT) | (1<<TWEA);
         flgRxCmd = 1;
         break;
         
@@ -113,21 +117,26 @@ ISR(TWI_vect){
         txDataPtr = 0;
         case TW_ST_DATA_ACK:
         TWDR = txbuffer[txDataPtr++];
-        twcrVal |= (1<<TWIE) | (1<<TWINT) | (1<<TWEA) | (1<<TWEN);
+        TWCR |= (1<<TWIE) | (1<<TWINT) | (1<<TWEA) | (1<<TWEN);
         if(txDataPtr >= txDataLen){
-            twcrVal &= ~(1<<TWEA);
+            TWCR &= ~(1<<TWEA);
         }
         break;
         
         // last byte transmitted and NACK received from master as expected
         case TW_ST_DATA_NACK:
-        twcrVal |= (1<<TWIE) | (1<<TWINT) | (1<<TWEA) | (1<<TWEN);
+        TWCR |= (1<<TWIE) | (1<<TWINT) | (1<<TWEA) | (1<<TWEN);
         break;
         
         //case TW_ST_DATA_ACK:
         //TWDR = txbuffer[txDataPtr++];
         //twcrVal |= (1<<TWIE) | (1<<TWINT) | (1<<TWEA) | (1<<TWEN);
         //break;
+        
+        case TW_BUS_ERROR:
+        TWCR &= ~( (1<<TWEA) | (1<<TWEN) );
+        TWCR = (1<<TWIE) | (1<<TWEA) | (1<<TWINT) | (1<<TWEN);
+        break;
         
         
         
