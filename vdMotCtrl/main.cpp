@@ -57,9 +57,7 @@ int main(void)
     
     
     while (1)
-    {
-        //test only!!!
-        
+    {        
         // task every ms
         if (oldSystemTicks != systemTicks){
             taskCnt++;
@@ -68,7 +66,7 @@ int main(void)
             if (i2cDev.cmdReceived()){
                 cmdRec = 1;
                 i2cDev.getCmd(&recCmd);
-                } else {
+            } else {
                 // TODO!
                 //if (uart.cmdReceived()){
                 //	cmdRec = 2;
@@ -94,7 +92,7 @@ int main(void)
                     } else if (cmdBuf[0] == 'm')
                     {
                         if ( (cmdBuf[1] == '0')
-                        || (cmdBuf[1] == '1'))
+                          || (cmdBuf[1] == '1'))
                         {
                             uint8_t driveNum = cmdBuf[1] - '0';
                             if (cmdBufLen == 3){
@@ -105,7 +103,7 @@ int main(void)
                         }
                         } else if (cmdBuf[0] == 'a'){
                         if ( (cmdBuf[1] == '0')
-                        || (cmdBuf[1] == '1') )
+                          || (cmdBuf[1] == '1') )
                         {
                             uint8_t driveNum = cmdBuf[1] - '0';
                             drives[driveNum].adapt();
@@ -120,18 +118,23 @@ int main(void)
                 if (recCmd.command == 0){ // get general status
                     uint8_t buffer[2] = {0,1};
                     i2cDev.setTxBuf(buffer, 2);
-                    } else if (recCmd.command == 1){ // get motor status
-                    uint8_t buffer[3] = {1,recCmd.motor, 0};
+                } else if (recCmd.command == 1){ // get motor status
+                    uint8_t buffer[3] = {1, recCmd.motor, 0};
                     uint8_t motNum = recCmd.motor;
                     if (motNum < C_NUM_DRIVES)
-                    buffer[2] = drives[motNum].getState();
-                    
+                        buffer[2] = drives[motNum].getState();
+                        
                     i2cDev.setTxBuf(buffer, 3);
-                    } else if (recCmd.command == 2){ // adapt function
+                } else if (recCmd.command == 2){ // adapt function
                     uint8_t motNum = recCmd.motor;
                     if (motNum < C_NUM_DRIVES)
                     drives[motNum].adapt();
-                    } else {
+                } else if (recCmd.command == 3){ // movement
+                    uint8_t motNum = recCmd.motor;
+                    if (motNum < C_NUM_DRIVES)
+                        drives[motNum].gotoPos(recCmd.parameter[0]);
+                } else
+                {
                 }
             }
             
