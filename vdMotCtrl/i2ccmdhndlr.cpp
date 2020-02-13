@@ -57,8 +57,9 @@ uint8_t i2cCmdHndlr::getCmd(s_i2cCmd* cmd){
 }
 
 uint8_t i2cCmdHndlr::setTxBuf(uint8_t * buffer, uint8_t len){
-    memcpy((void*)txbuffer, buffer, len);
-    txDataLen = len;
+    memcpy((void*)&txbuffer[1], buffer, len);
+    txbuffer[0] = len;
+    txDataLen = len+1;
     
     return 0;
 }
@@ -90,42 +91,46 @@ ISR(TWI_vect){
     switch (twsrState)
     {
         case TW_SR_SLA_ACK:
-        rxDataPtr = 0;
-        TWCR |= (1<<TWIE) | (1<<TWINT) | (1<<TWEA) | (1<<TWEN);
+            rxDataPtr = 0;
+            TWCR |= (1<<TWIE) | (1<<TWINT) | (1<<TWEA) | (1<<TWEN);
         break;
         
         case TW_SR_DATA_ACK:
-        rxbuffer[rxDataPtr++] = dataRec;
-        TWCR |= (1<<TWIE) | (1<<TWINT) | (1<<TWEA) | (1<<TWEN);
-        // next byte is last of buffer size -> send NAK
-        if(rxDataPtr >= I2C_RXBUFFER_SIZE-1){
-            TWCR &= ~(1<<TWEA);
-        }
+            rxbuffer[rxDataPtr++] = dataRec;
+            TWCR |= (1<<TWIE) | (1<<TWINT) | (1<<TWEA) | (1<<TWEN);
+            // next byte is last of buffer size -> send NAK
+            if(rxDataPtr >= I2C_RXBUFFER_SIZE-1){
+                TWCR &= ~(1<<TWEA);
+            }
         break;
         
         case TW_SR_DATA_NACK:
-        rxbuffer[rxDataPtr++] = dataRec;
-        TWCR |= (1<<TWIE) | (1<<TWINT) | (1<<TWEA) | (1<<TWEN);
+            rxbuffer[rxDataPtr++] = dataRec;
+            TWCR |= (1<<TWIE) | (1<<TWINT) | (1<<TWEA) | (1<<TWEN);
         break;
         
         case TW_SR_STOP:
-        TWCR |= (1<<TWINT) | (1<<TWEA);
-        flgRxCmd = 1;
+            TWCR |= (1<<TWINT) | (1<<TWEA);
+            flgRxCmd = 1;
         break;
         
         case TW_ST_SLA_ACK:
-        txDataPtr = 0;
+            txDataPtr = 0;
         case TW_ST_DATA_ACK:
-        TWDR = txbuffer[txDataPtr++];
-        TWCR |= (1<<TWIE) | (1<<TWINT) | (1<<TWEA) | (1<<TWEN);
-        if(txDataPtr >= txDataLen){
-            TWCR &= ~(1<<TWEA);
-        }
+            if(txDataPtr >= txDataLen)
+            {
+//              TWCR &= ~(1<<TWEA);
+                TWDR = 0;
+            } else
+            {
+                TWDR = txbuffer[txDataPtr++];
+            }
+            TWCR |= (1<<TWIE) | (1<<TWINT) | (1<<TWEA) | (1<<TWEN);
         break;
         
         // last byte transmitted and NACK received from master as expected
         case TW_ST_DATA_NACK:
-        TWCR |= (1<<TWIE) | (1<<TWINT) | (1<<TWEA) | (1<<TWEN);
+            TWCR |= (1<<TWIE) | (1<<TWINT) | (1<<TWEA) | (1<<TWEN);
         break;
         
         //case TW_ST_DATA_ACK:
@@ -134,8 +139,8 @@ ISR(TWI_vect){
         //break;
         
         case TW_BUS_ERROR:
-        TWCR &= ~( (1<<TWEA) | (1<<TWEN) );
-        TWCR = (1<<TWIE) | (1<<TWEA) | (1<<TWINT) | (1<<TWEN);
+            TWCR &= ~( (1<<TWEA) | (1<<TWEN) );
+            TWCR = (1<<TWIE) | (1<<TWEA) | (1<<TWINT) | (1<<TWEN);
         break;
         
         

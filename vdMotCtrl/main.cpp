@@ -24,6 +24,7 @@ extern "C"{
 
 #define I2C_CMD_SET_MOTOR_ADAPT     0x20
 #define I2C_CMD_SET_MOTOR_MOVE      0x21
+#define I2C_CMD_SET_MOTOR_MOVE_REL  0x22 // relative move
 
 extern volatile uint32_t systemTicks;
 vdmot drives[C_NUM_DRIVES];
@@ -111,12 +112,32 @@ int main(void)
                                 cmdBufLen = 0;
                             }
                         }
-                        } else if (cmdBuf[0] == 'a'){
+                    } else if (cmdBuf[0] == 'a'){
                         if ( (cmdBuf[1] == '0')
                         || (cmdBuf[1] == '1') )
                         {
                             uint8_t driveNum = cmdBuf[1] - '0';
                             drives[driveNum].adapt();
+                            cmdBufLen = 0;
+                        }
+                    } else if (cmdBuf[0] == 'i'){
+                        if ( (cmdBuf[1] == '0')
+                        || (cmdBuf[1] == '1') )
+                        {
+                            uint8_t driveNum = cmdBuf[1] - '0';
+                            uint8_t newPos = drives[driveNum].getPos();
+                            if (newPos < 255)
+                                drives[driveNum].gotoPos(newPos+1);
+                            cmdBufLen = 0;
+                        }
+                    } else if (cmdBuf[0] == 'd'){
+                        if ( (cmdBuf[1] == '0')
+                        || (cmdBuf[1] == '1') )
+                        {
+                            uint8_t driveNum = cmdBuf[1] - '0';
+                            uint8_t newPos = drives[driveNum].getPos();
+                            if (newPos > 0)
+                                drives[driveNum].gotoPos(newPos-1);
                             cmdBufLen = 0;
                         }
                     }
@@ -162,7 +183,28 @@ int main(void)
                             rspBuffer[2] = 0xFF; // error
                         }
                     rspBufLen = 3;
-                    } else // invalid command
+                    } else if (recCmd.command == I2C_CMD_SET_MOTOR_MOVE_REL){ // move relative function
+                        if (drives[motNum].getState() == STATE_IDLE)
+                        {
+                            uint8_t newPos = drives[motNum].getPos();
+                            uint8_t dir = recCmd.parameter[0];
+                            uint8_t steps = recCmd.parameter[1];
+                            if (dir == 0U) // move to close
+                            {
+                                newPos = (steps < newPos) ? newPos - steps : 0;
+                            } else
+                            {
+                                newPos = (steps < (255-newPos) ) ? newPos + steps : 255;
+                            }
+                            
+                            drives[motNum].gotoPos(newPos);
+                            rspBuffer[2] = 0;
+                        } else
+                        {
+                            rspBuffer[2] = 0xFF; // error
+                        }
+                        rspBufLen = 3;
+                    }else // invalid command
                     {
                         rspBuffer[2] = 0xFF; //error
                         rspBufLen = 3;
@@ -220,11 +262,11 @@ int main(void)
             }
 #endif
             
-            if ((systemTicks % 250) == 0){
+            if ((systemTicks % 256) == 0){
                 idleRatio = idleCnt;
                 idleCnt = 0;
                 
-                taskRatio = (uint8_t)(taskCnt/250);
+                taskRatio = (uint8_t)(taskCnt/256);
                 taskCnt = 0;
             }
             

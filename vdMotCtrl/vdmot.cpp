@@ -121,6 +121,8 @@ void vdmot::bgTask(void)
             _calValueClose = systemTicks - _ticksRunStart;
             _stopRun();
             _curPos = 0;
+            
+            // TODO: update calibration values to EEP
         }
         break;
         
