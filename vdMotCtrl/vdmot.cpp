@@ -204,13 +204,13 @@ errT vdmot::gotoPos(uint8_t targetPos){
         if (targetPos < _curPos){
             uint8_t move = _curPos - targetPos;
             uint32_t moveTicks = (uint32_t)move * _calValueClose;
-            moveTicks = moveTicks / 255;
+            moveTicks = moveTicks / 256;
             _startRun(0, moveTicks);
             _target = targetPos;
-            } else {
+        } else {
             uint8_t move = targetPos - _curPos;
             uint32_t moveTicks = (uint32_t)move * _calValue;
-            moveTicks = moveTicks / 255;
+            moveTicks = moveTicks / 256;
             _startRun(1, moveTicks);
             _target = targetPos;
         }
