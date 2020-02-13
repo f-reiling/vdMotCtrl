@@ -12,8 +12,8 @@
 #include <inttypes.h>
 
 typedef struct{
+    uint8_t subdevice;
     uint8_t command;
-    uint8_t motor;
     uint8_t parameter[2];
 }s_i2cCmd;
 

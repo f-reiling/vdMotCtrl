@@ -19,6 +19,12 @@ extern "C"{
 #define C_NUM_DRIVES 6
 #define ENABLE_DEBUGOUT
 
+#define I2C_CMD_GET_STATUS          0x00
+#define I2C_CMD_GET_MOTOR_POS       0x08
+
+#define I2C_CMD_SET_MOTOR_ADAPT     0x20
+#define I2C_CMD_SET_MOTOR_MOVE      0x21
+
 extern volatile uint32_t systemTicks;
 vdmot drives[C_NUM_DRIVES];
 i2cCmdHndlr i2cDev;
@@ -47,7 +53,7 @@ int main(void)
     
     i2cDev = i2cCmdHndlr(0x10);
     
-    s_i2cCmd recCmd = s_i2cCmd{.command = 0, .motor = 0};
+    s_i2cCmd recCmd = s_i2cCmd{.subdevice = 0, .command = 0};
     
     HWE::initAdc();
     HWE::initSystemTimer();
@@ -82,8 +88,10 @@ int main(void)
                         cmdBufLen = 0;
                     }
                 }
-                if(cmdBufLen > 1){
-                    if (cmdBuf[0] == 'c'){
+                if(cmdBufLen > 1)
+                {
+                    if (cmdBuf[0] == 'c')
+                    {
                         if ( (cmdBuf[1] == '0')
                         || (cmdBuf[1] == '1') )
                         {
@@ -116,23 +124,57 @@ int main(void)
             }
             
             if (cmdRec > 0){
+                uint8_t rspBuffer[4]; // 0 - subdevice, 1 - command, 2 - response code
+                uint8_t rspBufLen = 0;
+                uint8_t motNum;
+                rspBuffer[0] = recCmd.subdevice;
+                rspBuffer[1] = recCmd.command;
                 
-                if (recCmd.command == 0){ // get general status
-                    uint8_t buffer[2] = {0,1};
-                    i2cDev.setTxBuf(buffer, 2);
-                    } else if (recCmd.command == 1){ // get motor status
-                    uint8_t buffer[3] = {1,recCmd.motor, 0};
-                    uint8_t motNum = recCmd.motor;
-                    if (motNum < C_NUM_DRIVES)
-                    buffer[2] = drives[motNum].getState();
+                if (0U == recCmd.subdevice)
+                {
+                    if (I2C_CMD_GET_STATUS == recCmd.command)
+                    {
+                        rspBuffer[2] = 1; // TODO: currently not defined.
+                        rspBufLen = 3;
+                    }
+                } else if (recCmd.subdevice <= C_NUM_DRIVES)
+                {
+                    motNum = recCmd.subdevice-1U;   
+                    if (I2C_CMD_GET_STATUS == recCmd.command)
+                    {
+                        rspBuffer[2] = drives[motNum].getState();
+                        rspBufLen = 3;
+                    } else if (recCmd.command == I2C_CMD_GET_MOTOR_POS){ // get position
+                        rspBuffer[2] = drives[motNum].getPos();
+                        rspBufLen = 3;
                     
-                    i2cDev.setTxBuf(buffer, 3);
-                    } else if (recCmd.command == 2){ // adapt function
-                    uint8_t motNum = recCmd.motor;
-                    if (motNum < C_NUM_DRIVES)
-                    drives[motNum].adapt();
-                    } else {
+                    } else if (recCmd.command == I2C_CMD_SET_MOTOR_ADAPT){ // adapt function
+                        drives[motNum].adapt();
+                        rspBufLen = 3;
+                    
+                    } else if (recCmd.command == I2C_CMD_SET_MOTOR_MOVE){ // move function
+                        if (drives[motNum].getState() == STATE_IDLE)
+                        {
+                            drives[motNum].gotoPos(recCmd.parameter[0]);
+                            rspBuffer[2] = 0;
+                        } else
+                        {
+                            rspBuffer[2] = 0xFF; // error
+                        }
+                    rspBufLen = 3;
+                    } else // invalid command
+                    {
+                        rspBuffer[2] = 0xFF; //error
+                        rspBufLen = 3;
+                    }
+                    
+                } else // invalid subdevice number
+                {
+                    rspBuffer[2] = 0xFF; // error
+                    rspBufLen = 3;
                 }
+                
+                i2cDev.setTxBuf(rspBuffer, rspBufLen);
             }
             
             serialComm();
