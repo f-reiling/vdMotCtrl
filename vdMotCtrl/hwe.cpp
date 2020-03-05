@@ -8,6 +8,8 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
+#include "nvmConfig.h"
+
 volatile uint16_t adcBuffer[9];
 volatile uint32_t systemTicks;
 
@@ -143,6 +145,55 @@ ISR(ADC_vect){
     ADCSRA |= (1<<ADSC);
 }
 
+// Timer for 1ms base
 ISR(TIMER2_COMPA_vect){
     systemTicks++;
+}
+
+uint8_t HWE::eepRead(uint16_t startAdr, uint16_t len, void* data){
+    
+    uint16_t dataPos = 0;
+    
+    while (dataPos < len)
+    {
+        //EEARH = (uint8_t)((startAdr+dataPos)>>8)&0xFF;
+        //EEARL = (uint8_t)(startAdr+dataPos)&0xFF;
+        EEAR = (startAdr+dataPos);
+        EECR |= (1<<EERE);
+        ((uint8_t*)data)[dataPos] = EEDR;
+        dataPos++;
+    }
+    
+    return 0;
+}    
+
+uint8_t HWE::eepWrite(uint16_t startAdr, uint16_t len, void* data){
+    
+    uint16_t dataPos = 0;
+    
+    while (dataPos < len)
+    {
+        /* Wait for completion of previous write */
+        while(EECR & (1<<EEPE))
+        ;
+        /* Set up address and Data Registers */
+        EEAR = (startAdr+dataPos);
+        EEDR = ((uint8_t*)data)[dataPos];
+        /* Write logical one to EEMPE */
+        EECR |= (1<<EEMPE);
+        /* Start eeprom write by setting EEPE */
+        EECR |= (1<<EEPE);
+        dataPos++;
+    }
+    return 0;
+    
+}    
+
+void HWE::bgTask(void){
+    if (nvmChanged > 0U)
+    {
+        eepWrite(0U, sizeof(nvmParam), (void*)&nvmParam);
+        
+        nvmChanged = 0U;
+    }
 }

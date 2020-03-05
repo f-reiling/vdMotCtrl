@@ -24,6 +24,11 @@ class HWE
     static void initSystemTimer(void);
     uint32_t getSystemTicks(void);
     
+    static uint8_t eepRead(uint16_t startAdr, uint16_t len, void* data);
+    static uint8_t eepWrite(uint16_t startAdr, uint16_t len, void* data);
+    
+    static void bgTask(void);
+    
     //private:
     //static uint32_t _systemTicks;
 };

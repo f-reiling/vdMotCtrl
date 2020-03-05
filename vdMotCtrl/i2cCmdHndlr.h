@@ -17,6 +17,13 @@ typedef struct{
     uint8_t parameter[2];
 }s_i2cCmd;
 
+typedef struct{
+    uint8_t subdevice;
+    uint8_t command;
+    uint8_t errorCode;
+    uint8_t parameter[2];
+}s_i2cResponse;
+
 class i2cCmdHndlr
 {
     
@@ -32,6 +39,7 @@ class i2cCmdHndlr
     
     uint8_t getCmd(s_i2cCmd* cmd);
     uint8_t setTxBuf(uint8_t * buffer, uint8_t len);
+    uint8_t setTxBuf(s_i2cResponse * response, uint8_t len);
     
     private:
     uint8_t _ownAddress;

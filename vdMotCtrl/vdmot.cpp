@@ -7,10 +7,15 @@
 
 #include "vdmot.h"
 #include "hwe.h"
+#include "nvmConfig.h"
 
-extern uint32_t systemTicks;
+// read directly (no function call) for fast access
+extern volatile uint32_t systemTicks;
 
 #define DELAY_MOTOR_START_TICKS 100
+
+
+static uint8_t numInstances;
 
 vdmot::vdmot()
 :_state(STATE_IDLE)
@@ -38,6 +43,8 @@ vdmot::vdmot(uint8_t pinA, uint8_t pinB, uint8_t adcID)
     _runsSinceClose = 0;
     _ticksRunStart = 0;
     _ticksRunTarget = 0;
+    
+    _driveId = numInstances++;
 };
 
 void vdmot::bgTask(void)
@@ -123,6 +130,10 @@ void vdmot::bgTask(void)
             _curPos = 0;
             
             // TODO: update calibration values to EEP
+            nvmParam.vdMotParam[_driveId].calValue = _calValue;
+            nvmParam.vdMotParam[_driveId].calValueClose = _calValueClose;
+            
+            nvmChanged = 1;
         }
         break;
         
@@ -217,4 +228,5 @@ errT vdmot::gotoPos(uint8_t targetPos){
             _target = targetPos;
         }
     }
+    return NO_ERROR;
 }

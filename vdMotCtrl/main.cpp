@@ -9,6 +9,7 @@
 #include <avr/interrupt.h>
 #include <stdlib.h>
 
+#include "nvmConfig.h"
 #include "vdmot.h"
 #include "hwe.h"
 #include "i2cCmdHndlr.h"
@@ -29,6 +30,8 @@ extern "C"{
 extern volatile uint32_t systemTicks;
 vdmot drives[C_NUM_DRIVES];
 i2cCmdHndlr i2cDev;
+s_nvmParam nvmParam;
+uint8_t nvmChanged;
 
 int main(void)
 {
@@ -42,7 +45,6 @@ int main(void)
     uint8_t cmdBufLen = 0;
     /* Replace with your application code */
     
-    // TODO: read calibration values from EEP
     
     // drives connected to PINA, PINB, ADCNum
     drives[0] = vdmot(0x36, 0x37, 6); // PD6, PD7, ADC6
@@ -51,6 +53,18 @@ int main(void)
     drives[3] = vdmot(0x16, 0x17, 1); // PB6, PB7, ADC1
     drives[4] = vdmot(0x35, 0x34, 2); // PD5, PD4, ADC2
     drives[5] = vdmot(0x32, 0x33, 3); // PD2, PD3, ADC3
+    
+    // TODO: read calibration values from EEP
+    HWE::eepRead(0U, sizeof(nvmParam), (void*)&nvmParam );
+    for (uint8_t idx = 0; idx < C_NUM_DRIVES; idx++)
+    {
+        if (nvmParam.vdMotParam[idx].calValue != 0xFFFFFFFF){
+            drives[idx].setCalibration(nvmParam.vdMotParam[idx].calValue, 0U);
+        }
+        if (nvmParam.vdMotParam[idx].calValueClose != 0xFFFFFFFF){
+            drives[idx].setCalibration(nvmParam.vdMotParam[idx].calValueClose, 1U);
+        }
+    }
     
     i2cDev = i2cCmdHndlr(0x10);
     
@@ -93,8 +107,7 @@ int main(void)
                 {
                     if (cmdBuf[0] == 'c')
                     {
-                        if ( (cmdBuf[1] == '0')
-                        || (cmdBuf[1] == '1') )
+                        if ( (cmdBuf[1] == '0') || (cmdBuf[1] == '1') )
                         {
                             uint8_t driveNum = cmdBuf[1] - '0';
                             drives[driveNum].closeValve();
@@ -102,8 +115,7 @@ int main(void)
                         }
                     } else if (cmdBuf[0] == 'm')
                     {
-                        if ( (cmdBuf[1] == '0')
-                        || (cmdBuf[1] == '1'))
+                        if ( (cmdBuf[1] == '0') || (cmdBuf[1] == '1'))
                         {
                             uint8_t driveNum = cmdBuf[1] - '0';
                             if (cmdBufLen == 3){
@@ -113,16 +125,14 @@ int main(void)
                             }
                         }
                     } else if (cmdBuf[0] == 'a'){
-                        if ( (cmdBuf[1] == '0')
-                        || (cmdBuf[1] == '1') )
+                        if ( (cmdBuf[1] == '0') || (cmdBuf[1] == '1') )
                         {
                             uint8_t driveNum = cmdBuf[1] - '0';
                             drives[driveNum].adapt();
                             cmdBufLen = 0;
                         }
                     } else if (cmdBuf[0] == 'i'){
-                        if ( (cmdBuf[1] == '0')
-                        || (cmdBuf[1] == '1') )
+                        if ( (cmdBuf[1] == '0') || (cmdBuf[1] == '1') )
                         {
                             uint8_t driveNum = cmdBuf[1] - '0';
                             uint8_t newPos = drives[driveNum].getPos();
@@ -131,8 +141,7 @@ int main(void)
                             cmdBufLen = 0;
                         }
                     } else if (cmdBuf[0] == 'd'){
-                        if ( (cmdBuf[1] == '0')
-                        || (cmdBuf[1] == '1') )
+                        if ( (cmdBuf[1] == '0') || (cmdBuf[1] == '1') )
                         {
                             uint8_t driveNum = cmdBuf[1] - '0';
                             uint8_t newPos = drives[driveNum].getPos();
@@ -145,7 +154,7 @@ int main(void)
             }
             
             if (cmdRec > 0){
-                uint8_t rspBuffer[4]; // 0 - subdevice, 1 - command, 2 - response code
+                uint8_t rspBuffer[4]; // 0 - subdevice, 1 - command, 2 - response code, 3... - parameter value
                 uint8_t rspBufLen = 0;
                 uint8_t motNum;
                 rspBuffer[0] = recCmd.subdevice;
@@ -166,8 +175,9 @@ int main(void)
                         rspBuffer[2] = drives[motNum].getState();
                         rspBufLen = 3;
                     } else if (recCmd.command == I2C_CMD_GET_MOTOR_POS){ // get position
-                        rspBuffer[2] = drives[motNum].getPos();
-                        rspBufLen = 3;
+                        rspBuffer[2] = 0; // no error
+                        rspBuffer[3] = drives[motNum].getPos();
+                        rspBufLen = 4;
                     
                     } else if (recCmd.command == I2C_CMD_SET_MOTOR_ADAPT){ // adapt function
                         drives[motNum].adapt();
@@ -182,7 +192,7 @@ int main(void)
                         {
                             rspBuffer[2] = 0xFF; // error
                         }
-                    rspBufLen = 3;
+                        rspBufLen = 3;
                     } else if (recCmd.command == I2C_CMD_SET_MOTOR_MOVE_REL){ // move relative function
                         if (drives[motNum].getState() == STATE_IDLE)
                         {
@@ -220,6 +230,7 @@ int main(void)
             }
             
             serialComm();
+            HWE::bgTask();
             
             // background task for all drives
             for (uint8_t idxDrv = 0; idxDrv < C_NUM_DRIVES; idxDrv++)

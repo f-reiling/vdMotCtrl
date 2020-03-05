@@ -86,7 +86,7 @@ ISR(TWI_vect){
     // temporary stores the received data
     uint8_t dataRec = TWDR;
     uint8_t twsrState = (TWSR & 0xF8);
-    uint8_t twcrVal = TWCR;
+//    uint8_t twcrVal = TWCR;
     
     switch (twsrState)
     {

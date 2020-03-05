@@ -70,9 +70,13 @@ class vdmot
     uint32_t _calValueClose; // ticks needed from open to close
     uint16_t _adcThdVal; // adc value reached if valve closed
     
+    uint8_t _driveId;
+
+    
     errT _startRun(uint8_t direction, uint32_t ticks);
     errT _stopRun(void);
-
+    
+    public:
 }; //vdmot
 
 #endif //__VDMOT_H__
