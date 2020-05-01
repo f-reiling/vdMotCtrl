@@ -56,17 +56,30 @@ int main(void)
     
     // TODO: read calibration values from EEP
     HWE::eepRead(0U, sizeof(nvmParam), (void*)&nvmParam );
+    
+    if (nvmParam.version==0xFF)
+    {
+        nvmParam.i2cAddress = 0x10; // set default address
+        nvmParam.version = 0U;
+        
+        nvmChanged = 1;
+    }
+    
     for (uint8_t idx = 0; idx < C_NUM_DRIVES; idx++)
     {
         if (nvmParam.vdMotParam[idx].calValue != 0xFFFFFFFF){
             drives[idx].setCalibration(nvmParam.vdMotParam[idx].calValue, 0U);
+        } else {
+            drives[idx].setCalibration(0U, 0U);
         }
         if (nvmParam.vdMotParam[idx].calValueClose != 0xFFFFFFFF){
             drives[idx].setCalibration(nvmParam.vdMotParam[idx].calValueClose, 1U);
+        } else {
+            drives[idx].setCalibration(0U, 1U);
         }
     }
     
-    i2cDev = i2cCmdHndlr(0x10);
+    i2cDev = i2cCmdHndlr(nvmParam.i2cAddress);
     
     s_i2cCmd recCmd = s_i2cCmd{.subdevice = 0, .command = 0};
     
@@ -107,7 +120,7 @@ int main(void)
                 {
                     if (cmdBuf[0] == 'c')
                     {
-                        if ( (cmdBuf[1] == '0') || (cmdBuf[1] == '1') )
+                        if ( (cmdBuf[1] >= '0') && (cmdBuf[1] <= '6') )
                         {
                             uint8_t driveNum = cmdBuf[1] - '0';
                             drives[driveNum].closeValve();
@@ -115,7 +128,7 @@ int main(void)
                         }
                     } else if (cmdBuf[0] == 'm')
                     {
-                        if ( (cmdBuf[1] == '0') || (cmdBuf[1] == '1'))
+                        if ( (cmdBuf[1] >= '0') && (cmdBuf[1] <= '6') )
                         {
                             uint8_t driveNum = cmdBuf[1] - '0';
                             if (cmdBufLen == 3){
@@ -125,14 +138,14 @@ int main(void)
                             }
                         }
                     } else if (cmdBuf[0] == 'a'){
-                        if ( (cmdBuf[1] == '0') || (cmdBuf[1] == '1') )
+                        if ( (cmdBuf[1] >= '0') && (cmdBuf[1] <= '6') )
                         {
                             uint8_t driveNum = cmdBuf[1] - '0';
                             drives[driveNum].adapt();
                             cmdBufLen = 0;
                         }
                     } else if (cmdBuf[0] == 'i'){
-                        if ( (cmdBuf[1] == '0') || (cmdBuf[1] == '1') )
+                        if ( (cmdBuf[1] >= '0') && (cmdBuf[1] <= '6') )
                         {
                             uint8_t driveNum = cmdBuf[1] - '0';
                             uint8_t newPos = drives[driveNum].getPos();
@@ -141,7 +154,7 @@ int main(void)
                             cmdBufLen = 0;
                         }
                     } else if (cmdBuf[0] == 'd'){
-                        if ( (cmdBuf[1] == '0') || (cmdBuf[1] == '1') )
+                        if ( (cmdBuf[1] >= '0') && (cmdBuf[1] <= '6') )
                         {
                             uint8_t driveNum = cmdBuf[1] - '0';
                             uint8_t newPos = drives[driveNum].getPos();
